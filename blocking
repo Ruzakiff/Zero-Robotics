@@ -1,0 +1,80 @@
+//Declare any variables shared between functions here
+float origin[3];
+float otherState[12];
+float vectOther[3];
+float target[3];
+float distOpp;
+float myState[12];
+void init(){
+	origin[0]=0;
+	origin[1]=0;
+	origin[2]=0;
+	target[0]=0;
+	target[1]=0;
+	target[2]=0;
+}
+
+void loop(){
+    //states
+    api.getMyZRState(myState);
+    api.getOtherZRState(otherState);
+    
+    //get vector from base to opponent
+	mathVecSubtract(vectOther, otherState, origin, 3);
+	
+	//get distance from magnitude
+	distOpp=fabsf(mathVecNormalize(vectOther,3));
+	
+	//if statement says if our score is greater than their score + 10
+	//our opponent is more than .3 away from origin
+	//and opponent's speed is less than .015
+	
+	//can change conditions according to when we want to block.
+	//caution that if we decide to block to late, we will be pushed out of the way.
+	//opponent should be far away enough and slow enough
+	//also we want to ensure win if we block
+	
+	//taking out if statement for now to demonstrate method.
+	//if(game.getScore()>game.getOtherScore()+10&&distOpp>.3&&mathVecNormalize(otherState+3,3)<.015){
+	        block();
+	//}
+	moveTo(target);
+}
+void block(){
+    //target is base to opponent vector with magnitude of .1
+    //roughly less than tangent is enough radius to block
+    for(int i=0;i<3;i++){
+        target[i]=vectOther[i]*=.1;
+    }
+}
+void moveTo(float target[3]){
+    //we suggest to always be calling movement at bottom of code, and just changing the target before.
+    //For example, in our code, we just call movement ONCE at bottom of loop, and change target to what it needs to be.
+    //This movement function does use a little fuel even when stopped, but we think that is okay because it isn't much.
+    //no need to add extra code to prevent.
+    
+    //Our information
+    float futurePos[3];//Where we WILL be in the next second
+    float futureToTarget[3];//vector between target and future position
+    float distToTarget;//distance to target(absolute value)
+    float vectToTarget[3];//vector to target
+    float vectToSetMag;//multiplier, function of distance over time.
+    //We graphed SPHERE movement and linearized to save code space, and then took the function.
+    float futureDist;//Distance from futurePos to target
+    float currentVelMag;//Current Speed
+
+    for(int y=0;y<3;y++){
+        futurePos[y]=myState[y]+myState[y+3];//myposition+myVelocity
+    }
+	currentVelMag=fabsf(mathVecMagnitude(myState+3,3));//magnitude of speed.
+	mathVecSubtract(futureToTarget, target, futurePos, 3);//target-futureposition=futuretotarget
+	futureDist = fabsf(mathVecNormalize(futureToTarget, 3));//get distance from futurePos to target
+	mathVecSubtract(vectToTarget, target, myState, 3);//vector between target and our current position
+	distToTarget = fabsf(mathVecNormalize(vectToTarget, 3));//distance from target to our current position
+	vectToSetMag = fabsf(sqrt(.007*futureDist));//function that we got from graphing SPHERE movement
+	//can change number(0.007) to get faster but more fuel, or slower and less fuel.
+	for(int i=0;i<3;i++){
+	    futureToTarget[i]*=vectToSetMag;
+	}
+	api.setVelocityTarget(futureToTarget);
+}
