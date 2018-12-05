@@ -1,0 +1,38 @@
+//Declare any variables shared between functions here
+float target[3];
+void init(){
+    target[0]=-0.3;
+    target[1]=0.48;
+    target[2]=-0.16;
+}
+
+void loop(){
+	moveTo(target);
+}
+void moveTo(float target[3]){
+    float myState[12];//Our information
+    float futurePos[3];//Where we WILL be in the next second
+    float futureToTarget[3];//vector between target and future position
+    float distToTarget;//distance to target(absolute value)
+    float vectToTarget[3];//vector to target
+    float vectToSetMag;//multiplier, function of distance over time.
+    //We graphed SPHERE movement and linearized to save code space, and then took the function.
+    float futureDist;//Distance from futurePos to target
+    float currentVelMag;//Current Speed
+    
+    api.getMyZRState(myState);
+    for(int y=0;y<3;y++){
+        futurePos[y]=myState[y]+myState[y+3];//myposition+myVelocity
+    }
+	currentVelMag=fabsf(mathVecMagnitude(myState+3,3));//magnitude of speed.
+	mathVecSubtract(futureToTarget, target, futurePos, 3);//target-futureposition=futuretotarget
+	futureDist = fabsf(mathVecNormalize(futureToTarget, 3));//get distance from futurePos to target
+	mathVecSubtract(vectToTarget, target, myState, 3);//vector between target and our current position
+	distToTarget = fabsf(mathVecNormalize(vectToTarget, 3));//distance from target to our current position
+	vectToSetMag = fabsf(sqrt(.007*futureDist));//function that we got from graphing SPHERE movement
+	//can change number(0.007) to get faster but more fuel, or slower and less fuel.
+	for(int i=0;i<3;i++){
+	    futureToTarget[i]*=vectToSetMag;
+	}
+	api.setVelocityTarget(futureToTarget);
+}
