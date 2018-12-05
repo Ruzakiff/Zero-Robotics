@@ -1,0 +1,53 @@
+//Declare any variables shared between functions here
+float target[3];
+void init(){
+    target[0]=-0.3;
+    target[1]=0.48;
+    target[2]=-0.16;
+}
+
+void loop(){
+    //this code should not do anything because no geysers...
+    geyserEscape(target);//Should always run this
+    //we originally had it in our movement function to reduce redundancy
+}
+
+void geyserEscape(float target[3]){
+    float myState[12];//Our information
+    float futurePos[3];//Where we WILL be in the next second
+    float futureToTarget[3];//vector between target and future position
+    float distToTarget;//distance to target(absolute value) //this is NOT used in this function, only in movement function
+    float vectToTarget[3];//vector to target
+    float vectToSetMag;//multiplier, function of distance over time.
+    //We graphed SPHERE movement and linearized to save code space, and then took the function.
+    float futureDist;//Distance from futurePos to target
+    float currentVelMag;//Current Speed this is NOT used in this, only in movement function
+    int geyserTimer=0;//Time of geyser
+    int mySquare[2];//Our current square
+    float distxy;//distance from target ONLY in XY NOT Z
+    
+    api.getMyZRState(myState);
+    currentVelMag=fabsf(mathVecMagnitude(myState+3,3));//magnitude of speed. //NOT USED
+    
+	mathVecSubtract(futureToTarget, target, futurePos, 3);//target-futureposition=futuretotarget
+	futureDist = fabsf(mathVecNormalize(futureToTarget, 3));//get distance from futurePos to target
+	mathVecSubtract(vectToTarget, target, myState, 3);//vector between target and our current position
+	distToTarget = fabsf(mathVecNormalize(vectToTarget, 3));//distance from target to our current position //NOT USED
+	vectToSetMag = fabsf(sqrt(.007*futureDist));//function that we got from graphing SPHERE movement
+	//can change number(0.007) to get faster but more fuel, or slower and less fuel.
+	vectToTarget[2]=0;//get rid of z axis so we can take distxy, we already got the distance from it using
+	//distToTarget. So it is okay to change it now.
+	distxy=fabsf(mathVecNormalize(vectToTarget,3));//get distance from target to us, with Z is 0, so no Z
+    game.pos2square(myState,mySquare);//change myPos to mySquare
+    if(game.isGeyserHere(mySquare)||geyserTimer>0&&distxy<.02){//if there is geyser here OR
+    //geysertimer is not at 0(geyser is still appear)&&distance from target in XY is less than .02 (not overshoot)
+	    if(geyserTimer==0){//if 0, geyser just appeared
+	        geyserTimer=5;//start countdown
+	    }
+	    geyserTimer--;//countdown every second
+	    futureToTarget[2]=0;//Do not move in Z direction
+	    mathVecNormalize(futureToTarget, 3);//normalize it again
+	    vectToSetMag*=10;//multiply by strong force in XY
+	}
+	api.setVelocityTarget(futureToTarget);//gogogo
+}
