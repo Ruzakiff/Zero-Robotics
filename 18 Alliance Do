@@ -1,0 +1,130 @@
+void wykonaj()
+{
+            
+    switch(stage)
+    {
+    default:
+    {
+            if(game.checkSample()==true){
+                game.pickupSample();
+            }
+            
+            if(game.getNumSamplesHeld()==5 && game.getDrills(me)<3)
+            {
+                game.dropSample(4);
+            }
+            
+            if(game.getNumSamplesHeld()==5 || (game.getNumSamplesHeld()==4 && game.getDrills(me)==3))
+            {
+                stage = 5;
+            }
+            
+            if((api.getTime()>159 || game.getFuelRemaining()<0.12) && (game.getNumSamplesHeld()>1))
+            {
+            
+                    if(api.getTime()<166)
+                    {
+                        if(game.getFuelRemaining()>0.07f)
+                        {
+                            stage = 5;
+                        }
+                    }
+            }
+            
+            if(odl(me, cel)<0.065f){
+                drill();
+            }
+            else if(game.getDrillEnabled()){
+                game.stopDrill();
+            }
+            
+            moveTo(cel);
+        
+            break;
+    }
+    case 5:
+     {
+            game.stopDrill();
+    
+            float vecBetween[3];
+            float vecBetweenOpp[3];
+            mathVecSubtract(vecBetween, base, me, 3);
+            mathVecSubtract(vecBetweenOpp, other, me, 3);
+            if (mathVecMagnitude(vecBetweenOpp,3)<(mathVecMagnitude(vecBetween,3) - 0.1f) && odl(other, base)<0.2401f){
+                stage = 4;
+                game.dropSample(4);
+                break;
+            }
+            if(odl(me,base)>0.24){
+                float frac1 = (mathVecMagnitude(vecBetween,3) - 0.24f) / mathVecMagnitude(vecBetween,3);
+                vecBetween[0]*=frac1;
+                vecBetween[1]*=frac1;
+                vecBetween[2]*=frac1;
+                mathVecAdd(vecBetween,me,vecBetween,3); 
+                moveTo(vecBetween);
+                
+            }else{
+                api.setPositionTarget(me);
+            }
+           
+            
+        
+            if(game.atBaseStation()==true){
+            
+                for(int i =0; i<5; i++){
+                    game.dropSample(i);
+                }
+            
+                stage = 4;
+            }
+        
+        licznik = 0.007f;
+        break;
+    }
+    }
+    
+    int square[2];
+    game.pos2square(me, square);
+    
+    if(game.isGeyserHere(square)==true){
+        
+        float accAnty[3];
+        float geyser[3];
+        
+        if(stage == 5 || game.getNumSamplesHeld()>3)
+        {
+            stage = 5;
+            mathVecSubtract(accAnty,base,me,3);  
+            accAnty[2] *= 0.7f; 
+        }
+        else
+        {
+            mathVecSubtract(accAnty,cel,me,3);
+            accAnty[0] *=3000000000.0f;
+            accAnty[1] *=3000000000.0f;
+            accAnty[2]  *=3000000000.0f;
+            
+        }
+        
+        mathVecAdd(accAnty,me, accAnty,3); 
+        game.stopDrill();
+        licznik = 99999999999999999999.006f;
+        moveTo(accAnty);
+        licznik = 0.006f;
+    }
+    if (game.getFuelRemaining() <= 0.03f && stage!=5 && game.getDrillEnabled()==false){
+        cel[2] = -0.64f;
+        api.setPositionTarget(cel);
+    }
+    
+    if(game.getDrillError()){
+        game.stopDrill();
+    }
+    
+    if(game.getDrillEnabled()==false){
+        stopRotation();
+    }
+    else if(game.getDrillError()){
+        game.stopDrill();
+    }
+}
