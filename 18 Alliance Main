@@ -1,0 +1,36 @@
+//3D Alliance v5.1;
+
+float me[12], other[12];
+float base[3];
+float cel[3];
+float licznik;
+
+int stage;
+
+void init(){
+    DEBUG(("Greetings from ZaRoSphere vWIN * 100000E"));
+    
+    for(int i=0; i<3; i++)
+    {
+        base[i] = 0.0f;
+    }
+    
+    stage = 4;
+    licznik = 0.0109f;
+    
+    api.getMyZRState(me);
+    api.getOtherZRState(other);
+    set_bossy_target();
+    wykonaj(); 
+    
+}
+
+void loop(){
+    for(int i =0; i<20; i++)
+    {
+        api.getMyZRState(me);
+        api.getOtherZRState(other);
+        set_bossy_target();
+        wykonaj(); 
+    }
+}
