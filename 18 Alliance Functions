@@ -1,0 +1,118 @@
+void drill()
+{
+    float m[3];
+	if(game.getDrillEnabled()==false && canDrill()==true && canDrill2()==true){
+	        game.startDrill();
+	}
+	if(game.getDrillEnabled()){
+	    
+	    
+	  m[0]= -me[7];
+      m[1]= me[6];
+      m[2] = 0;
+      api.setAttitudeTarget(m);
+
+	}
+}
+
+bool canDrill()
+{
+    int lol =0;
+    for(int i =3; i<6; i++)
+    {
+        if(me[i]>=0.01f)
+        {
+            lol++;
+        }
+    }
+    
+    if(lol == 0)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+    
+    
+}
+
+    
+bool canDrill2()
+{
+    int lol =0;
+    for(int j = 9; j<12; j++)
+    {
+        if(me[j]>=0.04f)
+        {
+            lol++;
+        }
+    }
+    if(lol == 0)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void stopRotation()
+{
+    float rb[3];
+    if(stage==5){
+        
+        rb[0] = 0.0f;
+        rb[1] = 0.0f;
+        rb[2] = -1.0f;
+    }
+    else{
+        rb[0] = me[6];
+        rb[1] = me[7];
+        rb[2] = 0.0f;
+        mathVecNormalize(rb, 3);
+    }
+    
+    api.setAttitudeTarget(rb);
+}
+
+float odl(float a[3], float b[3]){ //distance
+	float c[3];
+	mathVecSubtract(c, a, b, 3);
+	return mathVecMagnitude(c, 3);
+}
+
+void moveTo(float target[3]){
+    
+    //we suggest to always be calling movement at bottom of code, and just changing the target before.
+    //For example, in our code, we just call movement ONCE at bottom of loop, and change target to what it needs to be.
+    //This movement function does use a little fuel even when stopped, but we think that is okay because it isn't much.
+    //no need to add extra code to prevent.
+    float myState[12];//Our information
+    float futurePos[3];//Where we WILL be in the next second
+    float futureToTarget[3];//vector between target and future position
+    float distToTarget;//distance to target(absolute value)
+    float vectToTarget[3];//vector to target
+    float vectToSetMag;//multiplier, function of distance over time.
+    //We graphed SPHERE movement and linearized to save code space, and then took the function.
+    float futureDist;//Distance from futurePos to target
+    float currentVelMag;//Current Speed
+    
+    api.getMyZRState(myState);
+    for(int y=0;y<3;y++){
+        futurePos[y]=myState[y]+myState[y+3];//myposition+myVelocity
+    }
+	currentVelMag=fabsf(mathVecMagnitude(myState+3,3));//magnitude of speed.
+	mathVecSubtract(futureToTarget, target, futurePos, 3);//target-futureposition=futuretotarget
+	futureDist = fabsf(mathVecNormalize(futureToTarget, 3));//get distance from futurePos to target
+	mathVecSubtract(vectToTarget, target, myState, 3);//vector between target and our current position
+	distToTarget = fabsf(mathVecNormalize(vectToTarget, 3));//distance from target to our current position
+	vectToSetMag = fabsf(sqrt(licznik*futureDist));//function that we got from graphing SPHERE movement
+	//can change number(0.007) to get faster but more fuel, or slower and less fuel.
+	for(int i=0;i<3;i++){
+	    futureToTarget[i]*=vectToSetMag;
+	}
+	api.setVelocityTarget(futureToTarget);
+}
