@@ -1,0 +1,62 @@
+void set_bossy_target()
+{
+    
+    for(int b=0; b<3; b++)
+    {
+        cel[b] = 20.0f;
+    }
+    
+    for(int i = -8; i<9; i++)
+    {
+        for(int j = -10; j<11; j++)
+        {
+            if(j<=2 && j>=-2 && i<=2 && i>=-2)
+            {
+                continue;
+            }
+            
+            int square[2];
+            square[0] = i;
+            square[1] = j;
+            
+            float pos[3];
+            game.square2pos(square, pos);
+            pos[2] = 0.2505f;
+            
+            if(odl(pos, other)<0.25f)
+            {
+                continue;
+            }
+            
+            if(game.getDrills(pos)>2)
+            {
+                continue;
+            }
+            
+            if(game.isGeyserHere(pos))
+            {
+                continue;
+            }
+            
+            if(game.getDrillEnabled()==false)
+            {
+                if(game.getDrills(square)>0)
+                {
+                        continue;
+                }
+            }
+                
+            
+            if(game.getTerrainHeight(square)==0.40f)
+            {
+                if((odl(me, pos) + odl(pos, base))<(odl(me, cel) + odl(cel, base)))
+                {
+                    for(int a=0; a<3; a++)
+                    {
+                        cel[a] = pos[a];
+                    }
+                }
+            }
+        }
+    }
+}
