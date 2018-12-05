@@ -1,0 +1,46 @@
+float atTarget[3];//target to spin to (attitude)
+float myState[12];//info
+void init(){
+    
+}
+
+void loop(){
+    api.getMyZRState(myState);
+
+    //POSSIBLE ATTARGETS
+    /*
+  //  align with XY plane, we don't care about Z, so set to zero. (tilted drilling)
+    atTarget[0]=myState[6];
+    atTarget[1]=myState[7];
+    atTarget[2]=0;
+    */
+    
+    //Start drilling, flip x and y, Z is 0 because we do not care about it
+    atTarget[0]=-myState[7];
+    atTarget[1]=myState[6];
+    atTarget[2]=0;
+    
+    
+    //align to base, Z is -1 because we have to face there, XY is 0 because we do not care about it.
+   //atTarget[0]=0;
+   //atTarget[1]=0;
+   //atTarget[2]=-1;
+    
+	spin(atTarget);//again, we think it makes more sense to just call spin once at end of loop
+	//and change target in loop, that way no conflict of first moving to one place, and then stop halfway.
+    
+}
+void spin(float atTarget[3]){
+    float quatState[13];//my info, but attitude is REPLACED with quaternion information
+    float baseQuat[3];//our current quaternion
+    float setQuat[4];//set quaternion to this
+    api.getMyZRState(myState);//get info
+	api.getMySphState(quatState);//get info
+	for(int i=0;i<4;i++){//set baseQuat equal to current quaternion
+	//We orignally just used memcpy, but for some reason it kept on failing simulation
+	    baseQuat[i]=quatState[i+6];
+	}
+   // memcpy(baseQuat, quatState+6, 4*sizeof(float));//set baseQuat equal to our current quaternion
+    api.attVec2Quat(myState+6, atTarget, baseQuat, setQuat);
+    api.setQuatTarget(setQuat);
+}
