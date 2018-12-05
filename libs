@@ -1,0 +1,136 @@
+//Begin page libs
+// Multiply a vector and a scalar - norm=true -> a versor is created
+void mVecMultAndNorm(float ret[3], float vinp[3], float mult, bool norm){
+	memcpy(ret,vinp,sizeof(float)*3);
+	if(norm) mathVecNormalize(ret,3);
+	for(int i = 0;i <3;i++){
+	    ret[i] *= mult;
+	}
+}
+//
+// Kinematic routines
+//
+// a routine to move quite fast (or saving energy, when k< 0.95) towards the selected target
+float setPosAndGo(float k){
+	float v[3],dtoT;
+	mathVecSubtract(v,Target,myState,3);
+	dtoT=mathVecMagnitude(v,3);
+//  go, but slowly
+    if(dtoT>0.30f){//0.35
+        k=0.06f;
+        mVecMultAndNorm (v,v,k,true);
+        if(mathVecMagnitude(&myState[3],3)<k||Time%35==0){
+            api.setVelocityTarget(v);
+        }
+        return dtoT;
+    }
+//  go, go, gooooo....
+	mVecMultAndNorm (v,v,k,false);
+	mathVecAdd (v,v,myState,3);
+	api.setPositionTarget(v);
+	return dtoT;
+}
+// check if conditions to dock an item
+void pointToItem(float kcorr){
+    float v[3];//,distFrTg,brake=0.018f;
+//    DEBUG(("tGbf1 = %f; tGbf2 = %f;tGbf3 = %f\n",Target[0],Target[1],Target[2]));
+        mathVecSubtract(v,Target,myState,3);
+        if(veryCloseItem||blocked)brake=-0.005;
+//    DEBUG(("time = %i; brake = %f\n",Time,brake));
+        mVecMultAndNorm (v,v,-kcorr-brake,true);
+        mathVecAdd(Target,Target,v,3);
+//    DEBUG(("tG1 = %f; tG2 = %f;tG3 = %f\n",Target[0],Target[1],Target[2]));
+}
+
+// A smart way to Move towards the Target
+void moveToTarget(){
+    alignToTarget();
+    dist=setPosAndGo(kvel);
+}
+
+// a fast alignment to the selected item
+void alignToTarget(){
+        float v[3];
+        mathVecSubtract(v,AlignTo,myState,3);
+// ***********
+///        mathVecSubtract(v,v,&myState[6],3);mVecMultAndNorm (v,v,1.3f,false);
+///        mathVecAdd(v,&myState[6],v,3);mathVecNormalize(v,3);
+// ***********
+//	if(Phase==1)DEBUG(("ms1 = %f;ms2 = %f;ms3 = %f\n",myState[0],myState[1],myState[2]));
+        mathVecNormalize(v,3);
+        angle=mathVecInner(v,&myState[6],3);
+        api.setAttitudeTarget(v);
+//	if(Phase==1)DEBUG(("TimeAlign = %i;angle = %f\n",Time, angle));
+}
+//
+// Strategy routines
+short minDistItem(){
+    short itemSelected,closestItem,i;
+    float v[3],kCor[3]={0.162f,0.149f,0.135f};
+    float myd, Score, maxScore, Tr, flItem, minDist, distSelected, mult;//othd, minOppDist;
+    itemSelected=6;maxScore=-100.f;Score=0.0f;Tr=(float)(180-Time);
+    minDist=10.0f;closestItem=6;distSelected=0.0f;mult=3.0f;//minOppDist=10.f;2.25
+	for(i=0;i<6;i++){
+// It is considered the location of items that have not already taken or that has not been picked up by the opponent
+	    if(chIt[i]>0){
+	        game.getItemLoc(itemLoc,i);
+            mathVecSubtract(v,itemLoc,myState,3);myd=mathVecMagnitude(v,3);
+            flItem= 0.2f-(float)game.getItemType(i)*0.05f; 
+            Score=(float)chIt[i]*flItem*(Tr-myd*40.f);
+////DEBUG(("i = %i; ItemType = %i; dist = %f; score=%f\n",i,game.getItemType(i),myd,Score));
+            if(myd<minDist){minDist=myd;closestItem=i;}
+            if(Score>maxScore){maxScore=Score;distSelected=myd;itemSelected=i;}
+	    }
+	}
+	if(game.getItemType(closestItem)==2)mult=3.0f;
+	if(!first&&firstChoice&&(distSelected>mult*minDist||minDist<0.40f)){
+	    itemSelected=closestItem;
+	    veryCloseItem=true;
+	} else {
+	    firstChoice=false;
+	}   
+    defend=(deltaScore>0.39f||maxScore<0.5f||(justDropped&&game.getFuelRemaining()<10));
+//    defend=(deltaScore>0.99f||maxScore<0.5f||(justDropped&&game.getFuelRemaining()<10));
+	dimn=kCor[game.getItemType(itemSelected)];
+	farthest=dimn+0.011f;closer=dimn-0.011f;
+////DEBUG(("****ITSEL = %i; maxscore = %f; FUEL = %f\n", itemSelected, maxScore, game.getFuelRemaining()));
+    return itemSelected;
+}
+
+void checkItems(){
+    float v1[3];
+    int i;
+	for(i=0;i<6;i++){
+	    if((chIt[i]<0)&&game.hasItem(i)==2)chIt[i]=1; // available again if opponent has stolen it
+	    if((chIt[i]>0)&&game.hasItem(i)>1)chIt[i]=-1; // as soon as anybody docks an item, it is unavailable
+	    game.getItemLoc(v1,i);
+	    mathVecAdd(v1,v1,zoneInfo,3);
+	    if(mathVecMagnitude(v1,3)<0.2f&&chIt[i]<3)chIt[i]=2; //
+	    if(justDropped&&chIt[i]==-4||(chIt[i]==-5&&Time>140))chIt[i]=1;
+	    if(chIt[i]==-5)chIt[i]++;
+	}
+//          DEBUG(("Time = %i; chIt[0] = %i; chIt[1]= %i; chIt[2] = %i\n",Time, chIt[0], chIt[1], chIt[2]));
+//          DEBUG(("Time2 = %i; chIt[3] = %i; chIt[4]= %i; chIt[5] = %i\n",Time, chIt[3], chIt[4], chIt[5]));
+}
+//
+bool checkDocking(){
+    bool jD=false;
+	if(dockItem){
+///DEBUG(("Trying to dock Item n = %i; at time %i\n", nItem, Time));
+	    if(game.dockItem(nItem)){
+///DEBUG(("####Item has been docked"));
+            dist=10.0f;
+            dockItem=false;jD=true;
+	    }
+    }
+    return jD;
+}
+//
+void choiceItem(){
+    nItem=minDistItem();
+    game.getItemLoc(itemLoc,nItem);
+    mVecMultAndNorm (AlignTo,itemLoc,1.0f,false);
+    mVecMultAndNorm (Target,itemLoc,1.0f,false);
+    if(first)return;
+    pointToItem(dimn);
+}

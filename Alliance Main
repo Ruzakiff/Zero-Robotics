@@ -1,0 +1,169 @@
+// SPACE-S ZR 2016 - PC 3D Phase Candidate 5 exp
+// 
+//
+// Changes:
+//
+// max.score:  (18.9.2016 - 9.55.41PM)
+//
+// date: 16/10/2016
+//
+// Definition of some of the main variables:
+// Time: current time (s);
+// nItem: current selected item;
+// Phase: current phase;
+// dist: distance from actual target;
+// dimn: distance to dock the chosen item;
+// angle: cos(angle) - attitude error
+// itemLoc[i]: location of i-th item 
+// zoneInfo[4]: location and uncertainty of the Assembly Zone;
+// distFromO; distance from opponent sphere;
+// Target: where my sphere is directed;
+// AlignTo: aligning direction to actual Target;
+// iside = +1 (blue sphere) - iside =  -1 (red sphere)
+//
+// definition of main code Knobs
+//
+
+#define HIGH_SPEED 1.75f
+#define VERY_LOW_SPEED 0.01f
+
+//
+bool defend, dockItem, justDropped, justDocked, collision, veryCloseItem, blocked, firstChoice;
+bool first;
+int chIt[6];
+short Time;
+int iSide, nItem, Phase;
+float dist, distFromO, kvel, dimn, angle, distFromItem;
+float myOldScore, deltaScore, mySpeed, brake, farthest, closer; 
+float itemLoc[3];
+float zoneInfo[4];
+float Target[3], AlignTo[3];
+ZRState myState;
+ZRState otherState;
+
+void init(){
+    int i;
+    defend=false;dockItem=false;justDropped=false;collision=false;
+    justDocked=false;veryCloseItem=false;blocked=false;first=true;
+    firstChoice=true;
+    iSide=1;Phase=0;
+    nItem=0;
+    dist=10.0f;dimn=0.162f;brake=0.018f;farthest=0.173f;closer=0.151f;
+    myOldScore=0.0f;
+    DEBUG(("Hallo everybody! - Proxima Centauri"));
+    for(i=0;i<6;i++){chIt[i]=1;}
+}
+void loop(){
+    float vet1[3], vet2[3], vet3[3], wrot1[3], wrot2[3];
+    float zero[3]={0.0f,0.0f,0.0f};
+// These are information needed at each time step
+    Time=api.getTime();
+    deltaScore=game.getScore()-myOldScore;
+    myOldScore=game.getScore();
+//
+    api.getMyZRState(myState);api.getOtherZRState(otherState);
+    mathVecSubtract(vet1,myState,otherState,3);
+    distFromO=mathVecMagnitude(vet1,3);mySpeed=mathVecMagnitude(&myState[3],3);
+    collision=(-mathVecInner(vet1,&myState[3],3)/(mySpeed*distFromO))>0.94f;
+//
+    if(defend) Phase=40;
+//
+// At Time 0 the first SPS is placed
+//
+    if(Time==0){
+	    memcpy(itemLoc,zero,sizeof(float)*3);
+	    memcpy(AlignTo,zero,sizeof(float)*3);
+	    memcpy(zoneInfo,zero,sizeof(float)*3);
+        if(myState[1]<0.0f)iSide=-1;
+        game.dropSPS();
+  	    Target[0]=-iSide*0.4917f;Target[1]=iSide*0.36085f;Target[2]=-iSide*0.0f;
+    }
+//
+//    
+// checkItems: each Item is given a number which identifies its status (vector chIt[6]):
+//   =  2 the Item is in the opponent Ass zone
+//   =  1 the Item is available to be docked
+//   = -1 the Item is not available (picked up by our/opp sphere)
+//   = -2 the Item has been  dropped in our Ass Zone
+//   = -5 the Item failed to be dropped in our Ass Zone
+//    
+    checkItems();
+//
+////DEBUG(("TTTT = %i;nSPS = %i; fase = %i\n",Time,game.getNumSPSHeld(),Phase));
+//    
+// Phase=0: The second SPS is placed
+//    
+    if(Phase==0&&(dist<=0.05f||Time>21)){
+//    if(Phase==0&&(iSide*myState[0]<=-0.33f||Time>21)){
+    		game.dropSPS();dist=10.0f;Phase=15;
+    }
+//    
+// Phase=15: Trying to dock the selected item. 
+//           After docking the first large item , the third SPS is placed
+//    
+    if(Phase==15){
+        choiceItem();
+        justDropped=false;
+//
+        if(first){
+            mVecMultAndNorm (vet1,myState,1.0f,true);
+            mVecMultAndNorm (vet2,Target,1.0f,true);
+            mathVecCross(wrot1,vet2,vet1);
+            mathVecCross(wrot2,wrot1,vet2);
+            mVecMultAndNorm (vet1,wrot2,0.18f,true);
+            mathVecAdd(Target,Target,vet1,3);
+        }
+//
+        justDocked=checkDocking();
+        if(justDocked){
+      	    game.dropSPS();justDocked=false;firstChoice=true;
+      	    veryCloseItem=false;brake=0.018;Phase=30;first=false;
+        }    
+    }
+//
+// Fase==30 The docked item is dropped to the Assembly Zone
+//
+    if(Phase==30){
+        game.getZone(zoneInfo);
+//DEBUG(("ITEM = %i; zif0 = %f; zif1 = %f; zif2 = %f\n",nItem, zoneInfo[0], zoneInfo[1], zoneInfo[2]));
+        mVecMultAndNorm (Target,zoneInfo,1.0,false);
+	    mVecMultAndNorm (AlignTo,zoneInfo,1.0,false);
+	    pointToItem(dimn);
+        if(angle>0.90f&&dist<0.045f){//0.035
+            game.dropItem();justDropped=true;
+//DEBUG(("!!!DROPPED item = %i\n",nItem));
+            if(game.itemInZone(nItem))chIt[nItem]=-2;
+            else chIt[nItem]=-5;
+            Phase=15;dist=10.f;
+		}
+    }
+//
+// Fase==40 Defend your position
+//
+    if(Phase==40){
+        mathVecSubtract(vet1,zoneInfo,otherState,3);
+        mVecMultAndNorm (vet1,vet1,-0.15f,true);
+        mathVecAdd(Target,zoneInfo,vet1,3);
+    }
+//
+// Sphere speed is chosen according to particuale Phase
+//
+    if(distFromO<=0.3f||(distFromO<0.7f&&collision))kvel=VERY_LOW_SPEED;
+    else if(veryCloseItem||blocked)kvel=2.0f;
+    else kvel=HIGH_SPEED;
+//
+///    DEBUG(("item = %i; zTg1 = %f; zTg2 = %f; zTg3 = %f\n",nItem, Target[0], Target[1], Target[2]));
+///    DEBUG(("item2 = %i; AL1 = %f; AL2 = %f; AL3 = %f\n",nItem, AlignTo[0], AlignTo[1], AlignTo[2]));
+//
+    if(!justDropped)moveToTarget();
+//
+    mathVecSubtract(vet1,itemLoc,myState,3);distFromItem=mathVecMagnitude(vet1,3);
+    blocked=(Phase==15&&(distFromItem-farthest)>0.02f&&(distFromItem-farthest)<0.05f&&mySpeed<0.01f);
+////DEBUG(("Time = %i; veryClose= %i; blocked = %i; defend = %i\n", Time, veryCloseItem, blocked, defend));
+    dockItem=(angle>0.96892&&mySpeed<0.01f&&distFromItem<farthest&&distFromItem>closer);
+    if(justDropped)dockItem=false;
+//
+//
+////    if(Phase>=0)DEBUG(("myspeed = %f; kvel = %f; dist= %f; angle = %f\n",mySpeed, kvel, distFromItem, angle));
+//
+}
